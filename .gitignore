@@ -1,0 +1,7 @@
+.idea
+.DS_Store
+_obj
+*.o
+*.a
+gotemplate_*.go
+*.test
