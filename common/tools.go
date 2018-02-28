@@ -111,8 +111,6 @@ func CheckLocalPort(port int, minMaximum ... int) int {
 func DeadLineTimer(deadline time.Time, ok bool) *time.Timer {
 	var duration time.Duration
 
-	fmt.Println("DeadLineTimer", deadline, ok)
-
 	if !ok {
 		duration = infiniteTimeout
 	} else if duration = deadline.Sub(time.Now()); duration<0 {

@@ -1,6 +1,9 @@
 package common
 
-import "bytes"
+import (
+	"bytes"
+	"github.com/pkg/errors"
+)
 
 type severalErrors struct {
 	errs    []error
@@ -32,6 +35,7 @@ func SeveralErrors(message string, listErrs ... error) error {
 		switch e := err.(type) {
 		case *severalErrors:
 			errs = append(errs, e.errs...)
+			errs = append(errs, errors.New(e.message))
 		default:
 			errs = append(errs, err)
 		}

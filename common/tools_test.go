@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"testing"
+	"time"
 )
 
 func TestMinMax(t *testing.T) {
@@ -29,7 +30,7 @@ func TestMinMax(t *testing.T) {
 	}
 
 	for _, test := range suites {
-		if exist := TestPair(minMax(test.exist.min, test.exist.max)); exist!=test.expected {
+		if exist := TestPair(minMax(test.exist.min, test.exist.max)); exist != test.expected {
 			t.Error("failed to sort min and max. Got ", exist, ", but expected is ", test.expected)
 		}
 	}
@@ -68,15 +69,15 @@ func TestRangeMinMax(t *testing.T) {
 	}
 
 	type testPair struct {
-		defMin int
-		defMax int
+		defMin     int
+		defMax     int
 		minMaximum []int
 	}
 
 	TestPair := func(minMaximum ... int) testPair {
 		return testPair{
-			defMin: defMin,
-			defMax: defMax,
+			defMin:     defMin,
+			defMax:     defMax,
 			minMaximum: minMaximum,
 		}
 	}
@@ -99,7 +100,7 @@ func TestRangeMinMax(t *testing.T) {
 	for _, test := range suites {
 		exist := ResultPair(rangeMinMax(test.exist.defMin, test.exist.defMax, test.exist.minMaximum...))
 
-		if exist!=test.expected {
+		if exist != test.expected {
 			t.Error("failed to sort min and max. Got ", exist, ", but expected is ", test.expected)
 		}
 	}
@@ -111,11 +112,11 @@ func TestRandomRange(t *testing.T) {
 	exist := map[int]bool{}
 	expectedLen := 10
 
-	for i:=0; i<expectedLen; i++ {
+	for i := 0; i < expectedLen; i++ {
 		exist[random.Int()] = true
 	}
 
-	if existLen := len(exist); existLen!=expectedLen || existLen==0 {
+	if existLen := len(exist); existLen != expectedLen {
 		t.Error("generated ", existLen, " random Int, but expected is ", expectedLen)
 	}
 }
@@ -124,10 +125,9 @@ func TestIsPortAvailable(t *testing.T) {
 	random := RandomRange(32000, 64000)
 
 	port := random.Int()
-	expected := false
 	exist := func() bool {
 		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-		if  err != nil {
+		if err != nil {
 			t.Error("failed to listen on port #", port, "to test it with ", err)
 			return false
 		}
@@ -136,16 +136,13 @@ func TestIsPortAvailable(t *testing.T) {
 		return isPortAvailable(port)
 	}()
 
-	if exist != expected {
-		t.Error("failed to check an already listened port. Got ", exist, ", but expected is ", expected)
+	if exist {
+		t.Error("failed to check an already listened port. Got ", exist, ", but expected is false")
 	}
 
 	port = random.Int()
-	expected = true
-	exist = isPortAvailable(port)
-
-	if exist != expected {
-		t.Error("failed to check a free port. Got ", exist, ", but expected is ", expected)
+	if !isPortAvailable(port) {
+		t.Error("failed to check a free port. Got ", exist, ", but expected is true")
 	}
 }
 
@@ -155,7 +152,7 @@ func TestCheckLocalPort(t *testing.T) {
 	port := random.Int()
 	exist := func() int {
 		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-		if  err != nil {
+		if err != nil {
 			t.Error("failed to start listen on port #", port, "to test it with ", err)
 			return 0
 		}
@@ -164,7 +161,7 @@ func TestCheckLocalPort(t *testing.T) {
 		return CheckLocalPort(port)
 	}()
 
-	if exist==0 || exist==port {
+	if exist == 0 || exist == port {
 		t.Error("failed to to check an already listened port. Got a port #", exist, ", but expected is not zero and other than ", port)
 	}
 
@@ -174,5 +171,46 @@ func TestCheckLocalPort(t *testing.T) {
 	if exist != port {
 		t.Error("failed to check a free port. Got a port #", exist, ", but expected is a port #", port)
 	}
+}
 
+func TestDeadLineTimer(t *testing.T) {
+	expected := 100 * time.Millisecond
+
+	start := time.Now()
+	<-DeadLineTimer(time.Now().Add(expected), true).C
+	exist := time.Since(start)
+
+	if exist <= expected {
+		t.Error("failed to catch expeted time. Got", exist, ", but expected", expected)
+	}
+
+	mode := func() int {
+		select {
+		case <-DeadLineTimer(time.Now().Add(expected), false).C:
+			return 1
+		case <-time.NewTimer(150 * time.Millisecond).C:
+			return 2
+		}
+
+		return 0
+	}()
+
+	if mode != 2 {
+		t.Error("failed to create inifinite timer on failure")
+	}
+
+	mode = func() int {
+		select {
+		case <-DeadLineTimer(time.Now().Add(-expected), true).C:
+			return 1
+		case <-time.NewTimer(150 * time.Millisecond).C:
+			return 2
+		}
+
+		return 0
+	}()
+
+	if mode != 1 {
+		t.Error("failed to create zero timer on past time")
+	}
 }

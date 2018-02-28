@@ -138,9 +138,7 @@ func (o *Monitoring) commandFlowExecution() {
 			continue
 		}
 
-		if finish, err := o.commandExecution(command); finish && !completely {
-			o.catchError(err)
-
+		if finish, _ := o.commandExecution(command); finish && !completely {
 			o.commandWait.Done()
 			completely = true
 		}
@@ -148,39 +146,41 @@ func (o *Monitoring) commandFlowExecution() {
 }
 
 func (o *Monitoring) commandExecution(ctx context.Context) (finish bool, err error) {
-	command := ctx.Value("command").(monitoringCommand)
-
+	var (
+		command = ctx.Value("command").(monitoringCommand)
+		doneErr error
+	)
 	ctx, done := CommandCtx(ctx, command)
-	fmt.Println("commandExecution:command=", ctx)
-	defer done(err)
+	defer func() {
+		done(doneErr)
+	}()
 
 	switch command {
 	case cmdStart:
-		fmt.Println("commandExecution::cmdStart")
 		finish, err = o.commandStart(ctx)
 
 	case cmdKill:
-		fmt.Println("commandExecution::cmdKill")
 		finish, err = o.commandKill(ctx)
 
 	case cmdStop:
-		fmt.Println("commandExecution::cmdStop")
 		finish, err = o.commandStop(ctx)
 
 	default:
-		fmt.Println("commandExecution::default")
 		err = errors.New(fmt.Sprint("unknown command:", command))
 	}
+
+	o.catchError(err)
+
+	doneErr = err
 
 	return
 }
 
 func (o *Monitoring) commandStart(ctx context.Context) (finish bool, err error) {
-	fmt.Println("commandStart:1")
 	if !atomic.CompareAndSwapInt32(&o.stage, execStopped.Int32(), execStarting.Int32()) {
 		return false, errors.New("failed to start execute command start - already started")
 	}
-	fmt.Println("commandStart:2")
+
 	if o.cmd == nil || len(o.cmd) == 0 {
 		parallelCount := o.parameter.ParallelCount()
 		if parallelCount <= 0 {
@@ -189,7 +189,7 @@ func (o *Monitoring) commandStart(ctx context.Context) (finish bool, err error) 
 
 		o.cmd = make([]*commandState, parallelCount)
 	}
-	fmt.Println("commandStart:3")
+
 	for i := range o.cmd {
 		o.cmd[i], err = CommandState(o.parameter)
 		if err != nil {
@@ -202,24 +202,16 @@ func (o *Monitoring) commandStart(ctx context.Context) (finish bool, err error) 
 		go cmd.Run(ctx, wait)
 	}
 
-	fmt.Println("commandStart:len(o.cmd)==", len(o.cmd))
-
 	for i := 0; i < len(o.cmd); i++ {
 		if cmdErr := <-wait; cmdErr != nil {
 			err = common.SeveralErrors("failed to start command:", err, cmdErr)
-
-			fmt.Println("commandStart:err", err)
 		}
 	}
-
-	fmt.Println("commandStart:finish", err)
 
 	// shutdown on failure
 	if err == nil {
 		err = o.startMonitoring()
 	} else {
-		fmt.Println("commandStart:killAll")
-
 		o.killAll()
 	}
 
@@ -289,8 +281,6 @@ func (o *Monitoring) commandKill(ctx context.Context) (finish bool, err error) {
 func (o *Monitoring) commandStop(ctx context.Context) (finish bool, err error) {
 	atomic.StoreInt32(&o.stage, execFinish.Int32())
 
-	fmt.Println("stageStop", ctx)
-
 	wait := make(chan interface{})
 
 	go func() {
@@ -316,16 +306,13 @@ func (o *Monitoring) monitoringProcess(cmd *commandState) {
 	for {
 		select {
 		case <-cmd.Wait():
-			fmt.Println("monitoringProcess:<-cmd.Wait()")
 
 		case <-o.monitoring:
-			fmt.Println("monitoringProcess:<-o.monitoring")
 			return
 		}
 
 		switch {
 		case repeat == RepeatInfinity, cmd.RunCount() <= repeat:
-			fmt.Println("monitoringProcess:Init, Run")
 			cmd.Init(o.parameter)
 			cmd.Run(context.Background(), wait)
 			if o.catchError(<-wait) != nil {
@@ -334,7 +321,6 @@ func (o *Monitoring) monitoringProcess(cmd *commandState) {
 			}
 
 		case repeat == RunOnce, cmd.RunCount() > repeat:
-			fmt.Println("monitoringProcess:Stop")
 			o.Stop(context.Background())
 			return
 		}

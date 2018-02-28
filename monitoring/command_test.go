@@ -176,19 +176,15 @@ func TestCoreCmd_Kill(t *testing.T) {
 		return
 	}
 
-	fmt.Println("cmd.Start():1")
 	if err := cmd.Start(); err != nil {
 		t.Error("failed to start command with", err)
 		return
 	}
-	fmt.Println("cmd.Start():2")
 
 	var mErr error
-	fmt.Println("cmd.Monitoring():1")
 	cmd.Monitoring(func(monitoringErr error){
 		mErr = monitoringErr
 	})
-	fmt.Println("cmd.Monitoring():2")
 
 	var (
 		wait     sync.WaitGroup
@@ -204,19 +200,15 @@ func TestCoreCmd_Kill(t *testing.T) {
 		wait.Done()
 	}()
 
-	fmt.Println("cmd.Kill():1")
 	if err := cmd.Kill(); err != nil {
 		t.Error("failed to kill command with", err)
 	}
-	fmt.Println("cmd.Kill():2")
 
 	wait.Wait()
 
 	if duration == 0 || duration >= time.Duration(timeout)*time.Second {
 		t.Error("failed to kill the command in time. Got duration", duration, ", but it should be by zero")
 	}
-
-	fmt.Println("mErr", mErr)
 }
 
 func TestCoreCmd_KillErr(t *testing.T) {

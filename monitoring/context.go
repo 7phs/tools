@@ -37,15 +37,7 @@ func CommandCtx(parent context.Context, command monitoringCommand) (context.Cont
 	}
 
 	return ctx, func(err error) {
-		fmt.Println("CommandCtx:DoneFunc")
-
-		fmt.Println("CommandCtx:DoneFunc:ctx.done(err)")
 		ctx.done(err)
-
-		if parentCtx, ok := parent.(*commandCtx); ok {
-			fmt.Println("StageCtx:DoneFunc:parentCtx.done(err)")
-			parentCtx.done(err)
-		}
 	}
 }
 
@@ -84,8 +76,6 @@ func (o *commandCtx) HasError() error {
 }
 
 func (o *commandCtx) done(v interface{}) {
-	fmt.Println("commandCtx:done(", v, ")")
-
 	o.Lock()
 
 	// already closed
@@ -94,13 +84,17 @@ func (o *commandCtx) done(v interface{}) {
 		return
 	}
 
-	o.err, _ = v.(error)
+	err, _ := v.(error)
 
+	o.err = err
 	if o.wait != nil {
-		fmt.Println("commandCtx:done:close(", o.wait, ")")
 		close(o.wait)
 	}
 	o.wait = closedChan
 
 	o.Unlock()
+
+	if parentCtx, ok := o.Context.(*commandCtx); ok {
+		parentCtx.done(err)
+	}
 }

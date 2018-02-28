@@ -1,7 +1,6 @@
 package monitoring
 
 import (
-	"fmt"
 	"io"
 	"os/exec"
 	"sync"
@@ -46,9 +45,7 @@ func (o *CoreCmd) prepare() (*CoreCmd, error) {
 		errErr error
 	)
 
-	o.monitoringClose = func() {
-		fmt.Println("DUMPY DUMP")
-	}
+	o.monitoringClose = func() {}
 
 	o.stdoutStream, errOut = o.reader2Stream(o.cmd.StdoutPipe())
 	o.stderrStream, errErr = o.reader2Stream(o.cmd.StderrPipe())
@@ -88,12 +85,9 @@ func (o *CoreCmd) Start() error {
 		return errors.Wrap(err, "failed to start command")
 	}
 
-	fmt.Println("Start: o.wait = make(chan bool)")
 	o.wait = make(chan bool)
 	go func() {
-		fmt.Println("o.cmd.Wait()")
 		o.cmd.Wait()
-		fmt.Println("close(o.wait)")
 		close(o.wait)
 	}()
 
@@ -105,9 +99,7 @@ func (o *CoreCmd) Kill() error {
 		return err
 	}
 
-	fmt.Println("o.monitoringClose()")
 	o.monitoringClose()
-	fmt.Println("o.monitoringWait.Wait()")
 	o.monitoringWait.Wait()
 
 	err := o.cmd.Process.Kill()
@@ -116,8 +108,6 @@ func (o *CoreCmd) Kill() error {
 }
 
 func (o *CoreCmd) monitoring() <-chan bool {
-	//w := o.monitoringCh
-	fmt.Println("monitoring() <-chan bool", o.monitoringCh)
 	return o.monitoringCh
 }
 
@@ -128,26 +118,19 @@ func (o *CoreCmd) Monitoring(done DoneFunc) {
 	}
 
 	o.monitoringCh = make(chan bool)
-	fmt.Println("Monitoring:o.monitoringClose = func() {close m}")
 	o.monitoringClose = func() {
-		fmt.Println("close(o.monitoringCh)", o.monitoringCh)
 		close(o.monitoringCh)
 	}
-	fmt.Println("Monitoring:o.monitoringWait.Add(1)")
 	o.monitoringWait.Add(1)
 
 	go func() {
-		fmt.Println("Monitoring: go func(){}")
 		select {
 		case <-o.Wait():
-			fmt.Println("Monitoring:<-o.Wait()")
 			done(nil)
 
 		case <-o.monitoring():
-			fmt.Println("Monitoring:<-o.monitoring()")
 		}
 
-		fmt.Println("Monitoring:o.monitoringWait.Done()")
 		o.monitoringWait.Done()
 	}()
 }

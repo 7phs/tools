@@ -62,8 +62,6 @@ func TestMonitoringWorkflow(t *testing.T) {
 
 	monitoring.Start(context.Background())
 
-	fmt.Println("monitoring.Start:finish")
-
 	if err := monitoring.HasError(); err != nil {
 		t.Error("failed to start command monitoring with", err)
 	}
@@ -129,7 +127,6 @@ func TestMonitoring_Waiting(t *testing.T) {
 
 	ctx, _ := context.WithTimeout(context.Background(), expectedTill)
 	monitoring.Start(ctx)
-	fmt.Println("start")
 	if err := monitoring.HasError(); err != nil {
 		t.Error("failed to start command monitoring with", err)
 	}
@@ -162,11 +159,11 @@ func TestMonitoring_Timeout(t *testing.T) {
 	monitoring.Start(ctx)
 	exist := time.Since(start)
 
+	monitoring.Wait()
+
 	if err := monitoring.HasError(); err == nil {
 		t.Error("failed to check timeout for start command monitoring")
 	}
-
-	monitoring.Wait()
 
 	if exist < expectedTill || exist > expectedTill*2 {
 		t.Error("failed to done command. Executed ", exist, ", but should be from ", expectedTill, " till ", expectedTill*2)
@@ -202,10 +199,16 @@ func TestMonitoring_Error(t *testing.T) {
 		runningMode: RunOnce,
 	})
 
-	monitoring.Start(context.Background())
+	ctx, _ := CommandCtx(context.Background(), monitoringCommand(1000))
+
+	monitoring.Start(ctx)
 
 	if err := monitoring.HasError(); err == nil {
 		t.Error("failed to catch error command")
+	}
+
+	if err := ctx.(*commandCtx).HasError(); err == nil {
+		t.Error("failed to catch error in command context")
 	}
 
 	monitoring.Stop(context.Background())
@@ -232,26 +235,6 @@ func TestMonitoring_Kill(t *testing.T) {
 
 	monitoring.Start(context.Background())
 
-	fmt.Println("monitoring.Start:finish")
-
-	if err := monitoring.HasError(); err != nil {
-		t.Error("failed to start command monitoring with", err)
-	}
-
-	time.Sleep(200 * time.Millisecond)
-
-	monitoring.Kill(context.Background())
-
-	fmt.Println("monitoring.Kill:finish")
-
-	if err := monitoring.HasError(); err != nil {
-		t.Error("failed to kill command monitoring with", err)
-	}
-
-	monitoring.Start(context.Background())
-
-	fmt.Println("monitoring.Start:2:finish")
-
 	if err := monitoring.HasError(); err != nil {
 		t.Error("failed to start command monitoring with", err)
 	}
@@ -266,7 +249,19 @@ func TestMonitoring_Kill(t *testing.T) {
 
 	monitoring.Start(context.Background())
 
-	fmt.Println("monitoring.Start:2:finish")
+	if err := monitoring.HasError(); err != nil {
+		t.Error("failed to start command monitoring with", err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	monitoring.Kill(context.Background())
+
+	if err := monitoring.HasError(); err != nil {
+		t.Error("failed to kill command monitoring with", err)
+	}
+
+	monitoring.Start(context.Background())
 
 	if err := monitoring.HasError(); err != nil {
 		t.Error("failed to start command monitoring with", err)
@@ -310,11 +305,13 @@ func TestMonitoring_StartCancellation(t *testing.T) {
 	}()
 	waitToStart.Wait()
 
+	time.Sleep(5 * time.Millisecond)
+
 	cancel()
 
 	waitToFinish.Wait()
 
-	fmt.Println("monitoring.Start:finish")
+	time.Sleep(50 * time.Millisecond)
 
 	if err := monitoring.HasError(); err == nil {
 		t.Error("failed to catch cancelation in start command monitoring with", err)
@@ -369,6 +366,8 @@ func TestMonitoring_KillCancellation(t *testing.T) {
 
 	waitToFinish.Wait()
 
+	time.Sleep(100 * time.Millisecond)
+
 	if err := monitoring.HasError(); err == nil {
 		t.Error("failed to catch cancelation in kill command monitoring with", err)
 	}
@@ -412,7 +411,6 @@ func TestMonitoring_StopCancellation(t *testing.T) {
 
 		waitToFinish.Done()
 	}()
-	waitToStart.Wait()
 
 	cancel()
 
@@ -424,7 +422,3 @@ func TestMonitoring_StopCancellation(t *testing.T) {
 		t.Error("failed to catch cancelation in stop command monitoring with", err)
 	}
 }
-
-//func TestMonitoring_DoubleStart(t *testing.T) {
-//
-//}
