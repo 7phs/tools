@@ -7,10 +7,11 @@ import (
 
 	"github.com/pkg/errors"
 
-	"bitbucket.org/7phs/tools/common"
+	"github.com/7phs/tools/common"
 )
 
 type Parameter interface {
+	WorkDir() string
 	Command() string
 	ToArgs() []string
 }
@@ -35,6 +36,7 @@ func NewCoreCmd(parameter Parameter) (*CoreCmd, error) {
 
 func (o *CoreCmd) init(parameter Parameter) *CoreCmd {
 	o.cmd =  exec.Command(parameter.Command(), parameter.ToArgs()...)
+	o.cmd.Dir = parameter.WorkDir()
 
 	return o
 }

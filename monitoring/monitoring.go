@@ -9,24 +9,13 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/7phs/tools/common"
 	"github.com/pkg/errors"
-	"bitbucket.org/7phs/tools/common"
 )
 
 type monitoringCommand int
 
 type monitoringStage int
-
-const (
-	execStopped    monitoringStage = iota
-	execStarting
-	execMonitoring
-	execFinish
-
-	cmdStart monitoringCommand = iota
-	cmdKill
-	cmdStop
-)
 
 func (o monitoringStage) Int32() int32 {
 	return int32(o)
@@ -35,6 +24,17 @@ func (o monitoringStage) Int32() int32 {
 func (o monitoringCommand) Int32() int32 {
 	return int32(o)
 }
+
+const (
+	execStopped monitoringStage = iota
+	execStarting
+	execMonitoring
+	execFinish
+
+	cmdStart monitoringCommand = iota
+	cmdKill
+	cmdStop
+)
 
 const (
 	RepeatInfinity int32 = 0 - iota
@@ -46,10 +46,12 @@ type MonitoringParameter interface {
 
 	RunningMode() int32
 	ParallelCount() int32
+	StdErrIsOk() bool
+	CheckStartLine() func(string) bool
 }
 
 type Monitoring struct {
-	parameter MonitoringParameter
+	MonitoringParameter
 
 	cmd []*commandState
 	err error
@@ -66,7 +68,7 @@ type Monitoring struct {
 
 func NewMonitoring(parameter MonitoringParameter) *Monitoring {
 	return (&Monitoring{
-		parameter: parameter,
+		MonitoringParameter: parameter,
 
 		commandFlow: make(chan context.Context),
 	}).init()
@@ -138,7 +140,8 @@ func (o *Monitoring) commandFlowExecution() {
 			continue
 		}
 
-		if finish, _ := o.commandExecution(command); finish && !completely {
+		finish, _ := o.commandExecution(command)
+		if finish && !completely {
 			o.commandWait.Done()
 			completely = true
 		}
@@ -182,7 +185,7 @@ func (o *Monitoring) commandStart(ctx context.Context) (finish bool, err error) 
 	}
 
 	if o.cmd == nil || len(o.cmd) == 0 {
-		parallelCount := o.parameter.ParallelCount()
+		parallelCount := o.ParallelCount()
 		if parallelCount <= 0 {
 			parallelCount = 1
 		}
@@ -191,7 +194,7 @@ func (o *Monitoring) commandStart(ctx context.Context) (finish bool, err error) 
 	}
 
 	for i := range o.cmd {
-		o.cmd[i], err = CommandState(o.parameter)
+		o.cmd[i], err = CommandState(o)
 		if err != nil {
 			return true, errors.Wrapf(err, "failed to create command for monitoring")
 		}
@@ -229,7 +232,7 @@ func (o *Monitoring) killAll() {
 	for _, cmd := range o.cmd {
 		wait.Add(1)
 		go func(cmd *commandState) {
-			if cmd != nil && cmd.IsExited() {
+			if cmd != nil && !cmd.IsExited() {
 				cmd.Kill()
 			}
 
@@ -275,7 +278,7 @@ func (o *Monitoring) commandKill(ctx context.Context) (finish bool, err error) {
 		err = errors.New("user cancel")
 	}
 
-	return false, err
+	return true, err
 }
 
 func (o *Monitoring) commandStop(ctx context.Context) (finish bool, err error) {
@@ -300,7 +303,7 @@ func (o *Monitoring) commandStop(ctx context.Context) (finish bool, err error) {
 }
 
 func (o *Monitoring) monitoringProcess(cmd *commandState) {
-	repeat := o.parameter.RunningMode()
+	repeat := o.RunningMode()
 	wait := make(chan error)
 
 	for {
@@ -313,7 +316,7 @@ func (o *Monitoring) monitoringProcess(cmd *commandState) {
 
 		switch {
 		case repeat == RepeatInfinity, cmd.RunCount() <= repeat:
-			cmd.Init(o.parameter)
+			cmd.Init(o)
 			cmd.Run(context.Background(), wait)
 			if o.catchError(<-wait) != nil {
 				o.Stop(context.Background())

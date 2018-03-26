@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"bitbucket.org/7phs/tools/common"
+	"github.com/7phs/tools/common"
 )
 
 func TestNewCoreCmd(t *testing.T) {
@@ -28,15 +28,15 @@ func TestNewCoreCmd(t *testing.T) {
 func TestCoreCmd_prepareStream(t *testing.T) {
 	cmd := CoreCmd{}
 
-	if stream, err := cmd.reader2Stream(nil, errors.New("test error")); stream!=nil || err==nil {
+	if stream, err := cmd.reader2Stream(nil, errors.New("test error")); stream != nil || err == nil {
 		t.Error("failed to catch error")
 	}
 
-	if stream, err := cmd.reader2Stream(nil, nil); stream!=nil || err==nil {
+	if stream, err := cmd.reader2Stream(nil, nil); stream != nil || err == nil {
 		t.Error("failed to catch nill reader")
 	}
 
-	if stream, err := cmd.reader2Stream(bytes.NewBufferString("hello"), nil); stream==nil || err!=nil {
+	if stream, err := cmd.reader2Stream(bytes.NewBufferString("hello"), nil); stream == nil || err != nil {
 		t.Error("failed to make stream with ", err)
 	}
 }
@@ -182,7 +182,7 @@ func TestCoreCmd_Kill(t *testing.T) {
 	}
 
 	var mErr error
-	cmd.Monitoring(func(monitoringErr error){
+	cmd.Monitoring(func(monitoringErr error) {
 		mErr = monitoringErr
 	})
 
@@ -274,14 +274,14 @@ func TestCoreCmd_Monitoring(t *testing.T) {
 
 	wait.Add(1)
 	go func() {
-		cmd.Monitoring(func(err error){
+		cmd.Monitoring(func(err error) {
 			wait.Done()
 		})
 	}()
 
 	wait.Wait()
 
-	if exist := strings.TrimSpace(common.ReadAll(cmd.StdOut())); strings.Compare(expected, exist)!=0 {
+	if exist := strings.TrimSpace(common.ReadAll(cmd.StdOut())); strings.Compare(expected, exist) != 0 {
 		t.Error("unexpected output of the command. Got '", exist, "', but expected is '", expected, "'")
 	}
 }
@@ -299,7 +299,7 @@ func TestCoreCmd_MonitoringErr(t *testing.T) {
 	}
 
 	err = nil
-	cmd.Monitoring(func(monitoringErr error){
+	cmd.Monitoring(func(monitoringErr error) {
 		err = monitoringErr
 	})
 
